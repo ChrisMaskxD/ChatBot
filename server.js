@@ -2,17 +2,17 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { sendMessage, sendDocument, markAsRead } = require('./services/whatsapp');
-const { gerarResposta } = require('./services/ai');
+const { gerarResposta, limparHistorico } = require('./services/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
+const PDF_CATALOGO_URL = process.env.PDF_CATALOGO_URL || '';
 
-// Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Store para histórico e estatísticas
+// Estado da aplicação
 const appState = {
   messagesReceived: 0,
   messagesSent: 0,
@@ -21,159 +21,128 @@ const appState = {
   history: [],
   logs: [],
   config: {
-    aiModel: 'gpt-3.5-turbo',
+    aiModel: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
     temperature: 0.7,
     maxTokens: 500,
     customPrompt: '',
   },
 };
 
-// Logs
-console.log('[Server] Iniciando servidor de automação WhatsApp com IA');
+console.log('[Server] Iniciando servidor WhatsApp AI Bot');
 console.log(`[Server] Phone Number ID: ${process.env.PHONE_NUMBER_ID}`);
 
-/**
- * GET /webhook - Validação do webhook do WhatsApp
- */
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function adicionarLog(tipo, mensagem) {
+  const agora = new Date().toLocaleTimeString('pt-BR');
+  appState.logs.push({ type: tipo, message: mensagem, timestamp: new Date().toISOString() });
+  console.log(`${agora} ${tipo} ${mensagem}`);
+  if (appState.logs.length > 500) appState.logs = appState.logs.slice(-500);
+}
+
+// ─── Webhook ──────────────────────────────────────────────────────────────────
+
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  console.log(`[Webhook] Recebido pedido de verificação`);
-
   if (mode === 'subscribe' && token === WEBHOOK_VERIFY_TOKEN) {
-    console.log(`[Webhook] Webhook verificado com sucesso`);
+    console.log('[Webhook] Verificado com sucesso');
     res.status(200).send(challenge);
   } else {
-    console.error(`[Webhook] Falha na verificação: token inválido`);
+    console.error('[Webhook] Falha na verificação: token inválido');
     res.sendStatus(403);
   }
 });
 
-/**
- * POST /webhook - Recebe mensagens do WhatsApp
- */
 app.post('/webhook', async (req, res) => {
   try {
     const dados = req.body;
+    if (dados.object !== 'whatsapp_business_account') return res.sendStatus(404);
 
-    // Validar se é uma entrada válida
-    if (dados.object !== 'whatsapp_business_account') {
-      res.sendStatus(404);
-      return;
-    }
+    const messages = dados.entry?.[0]?.changes?.[0]?.value?.messages;
+    if (!messages || messages.length === 0) return res.sendStatus(200);
 
-    const entry = dados.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
-    const messages = value?.messages;
-
-    // Se não houver mensagens, retornar
-    if (!messages || messages.length === 0) {
-      res.sendStatus(200);
-      return;
-    }
-
-    // Processar cada mensagem
     for (const mensagem of messages) {
-      await processarMensagem(mensagem, value);
+      await processarMensagem(mensagem);
     }
 
     res.sendStatus(200);
   } catch (error) {
-    console.error('[Webhook] Erro ao processar webhook:', error.message);
+    console.error('[Webhook] Erro:', error.message);
     res.sendStatus(500);
   }
 });
 
-/**
- * Adiciona um log ao histórico
- */
-function adicionarLog(tipo, mensagem) {
-  const agora = new Date().toLocaleTimeString('pt-BR');
-  appState.logs.push({
-    type: tipo,
-    message: mensagem,
-    timestamp: new Date().toISOString(),
-  });
+// ─── Processamento de mensagens ───────────────────────────────────────────────
 
-  console.log(`${agora} ${tipo} ${mensagem}`);
+async function processarMensagem(mensagem) {
+  const inicio = Date.now();
+  const numeroOrigem = mensagem.from;
+  const messageId = mensagem.id;
 
-  // Manter máximo de 500 logs
-  if (appState.logs.length > 500) {
-    appState.logs = appState.logs.slice(-500);
-  }
-}
-
-/**
- * Processa uma mensagem recebida do WhatsApp
- * @param {object} mensagem - Objeto da mensagem
- * @param {object} value - Contexto da mensagem
- */
-async function processarMensagem(mensagem, value) {
   try {
-    const numeroOrigem = mensagem.from;
-    const messageId = mensagem.id;
-    const textoRecebido = mensagem.text?.body || '';
-
-    console.log(`[Processamento] Mensagem de ${numeroOrigem}: "${textoRecebido}"`);
     appState.messagesReceived++;
 
     // Marcar como lida
-    try {
-      await markAsRead(messageId);
-    } catch (error) {
-      console.warn('[Processamento] Não foi possível marcar mensagem como lida');
+    try { await markAsRead(messageId); } catch {}
+
+    // Ignorar mensagens que não são de texto
+    if (mensagem.type !== 'text') {
+      await sendMessage(numeroOrigem, 'Olá! No momento, só consigo responder mensagens de texto. 😊');
+      adicionarLog('[INFO]', `Mensagem não-texto ignorada de ${numeroOrigem} (tipo: ${mensagem.type})`);
+      return;
     }
+
+    const textoRecebido = mensagem.text.body.trim();
+    console.log(`[Processamento] De ${numeroOrigem}: "${textoRecebido}"`);
 
     let tipoResposta = '';
     let resposta = '';
 
-    // Status da loja
-    if (textoRecebido.toLowerCase().trim() === 'oi') {
-      console.log(`[Processamento] Detectado: cumprimento "oi"`);
-      tipoResposta = 'Cumprimento';
-      resposta = await gerarResposta(
-        'Responda de forma breve e amigável a um cumprimento de um cliente.'
-      );
+    // Comando: limpar histórico
+    if (textoRecebido.toLowerCase() === 'limpar' || textoRecebido.toLowerCase() === '/limpar') {
+      limparHistorico(numeroOrigem);
+      resposta = 'Histórico da conversa limpo! Podemos começar do zero. 😊';
+      tipoResposta = 'Comando';
       await sendMessage(numeroOrigem, resposta);
     }
-    // Enviar catálogo (PDF)
-    else if (textoRecebido.toLowerCase().trim() === 'catalogo') {
-      console.log(`[Processamento] Detectado: pedido de catálogo`);
+    // Cumprimento
+    else if (textoRecebido.toLowerCase() === 'oi' || textoRecebido.toLowerCase() === 'olá') {
+      tipoResposta = 'Cumprimento';
+      resposta = await gerarResposta(numeroOrigem, textoRecebido, appState.config);
+      await sendMessage(numeroOrigem, resposta);
+    }
+    // Catálogo
+    else if (textoRecebido.toLowerCase() === 'catalogo' || textoRecebido.toLowerCase() === 'catálogo') {
       tipoResposta = 'Catálogo';
+      await sendMessage(numeroOrigem, 'Aqui está nosso catálogo! 📄 Confira os produtos disponíveis.');
 
-      // Enviar resposta informativa
-      await sendMessage(
-        numeroOrigem,
-        'Aqui está nosso catálogo! 📄 Confira os produtos disponíveis.'
-      );
-
-      // Enviar PDF - Substitua o link pelo seu PDF hospedado
-      const linkCatalogo =
-        'https://exemplo.com/catalogo.pdf';
-      try {
-        await sendDocument(numeroOrigem, linkCatalogo, 'Catalogo.pdf');
-        resposta = 'Catálogo enviado';
-      } catch (error) {
-        console.error('[Processamento] Erro ao enviar catálogo');
-        await sendMessage(
-          numeroOrigem,
-          'Desculpe, não consegui enviar o catálogo agora. Tente novamente mais tarde.'
-        );
-        resposta = 'Erro ao enviar catálogo';
+      if (!PDF_CATALOGO_URL) {
+        await sendMessage(numeroOrigem, 'O catálogo ainda não está disponível. Entre em contato conosco!');
+        resposta = 'Catálogo sem URL configurada';
+      } else {
+        try {
+          await sendDocument(numeroOrigem, PDF_CATALOGO_URL, 'Catalogo.pdf');
+          resposta = 'Catálogo enviado';
+        } catch {
+          await sendMessage(numeroOrigem, 'Desculpe, não consegui enviar o catálogo agora. Tente novamente mais tarde.');
+          resposta = 'Erro ao enviar catálogo';
+        }
       }
     }
-    // Qualquer outra mensagem - responder com IA
+    // Qualquer outra mensagem → IA com contexto de conversa
     else {
-      console.log(`[Processamento] Usando IA para responder`);
       tipoResposta = 'IA';
-      resposta = await gerarResposta(textoRecebido);
+      resposta = await gerarResposta(numeroOrigem, textoRecebido, appState.config);
       await sendMessage(numeroOrigem, resposta);
     }
 
-    // Adicionar ao histórico
+    // Atualizar stats
+    const tempo = Date.now() - inicio;
+    appState.messagesSent++;
+    appState.avgTime = Math.round((appState.avgTime + tempo) / 2);
     appState.history.push({
       phone: numeroOrigem,
       message: textoRecebido,
@@ -182,35 +151,22 @@ async function processarMensagem(mensagem, value) {
       timestamp: new Date().toISOString(),
       status: 'respondida',
     });
+    if (appState.history.length > 500) appState.history = appState.history.slice(-500);
 
-    appState.messagesSent++;
-    adicionarLog('[SUCCESS]', `Mensagem processada: ${tipoResposta} para ${numeroOrigem}`);
+    adicionarLog('[SUCCESS]', `${tipoResposta} para ${numeroOrigem} (${tempo}ms)`);
   } catch (error) {
     appState.errors++;
-    console.error('[Processamento] Erro ao processar mensagem:', error.message);
-    adicionarLog('[ERROR]', `Erro ao processar: ${error.message}`);
+    console.error('[Processamento] Erro:', error.message);
+    adicionarLog('[ERROR]', `Erro ao processar mensagem de ${numeroOrigem}: ${error.message}`);
   }
 }
 
-/**
- * GET / - Health check
- */
+// ─── API do Dashboard ─────────────────────────────────────────────────────────
+
 app.get('/', (req, res) => {
-  res.json({
-    status: 'online',
-    service: 'WhatsApp AI Automation',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: 'online', service: 'WhatsApp AI Bot', version: '1.1.0', timestamp: new Date().toISOString() });
 });
 
-/**
- * ====== ENDPOINTS DA API PARA O DASHBOARD ======
- */
-
-/**
- * GET /api/stats - Retorna estatísticas
- */
 app.get('/api/stats', (req, res) => {
   res.json({
     messagesReceived: appState.messagesReceived,
@@ -220,74 +176,51 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-/**
- * GET /api/health - Status do servidor
- */
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'online',
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-  });
+  res.json({ status: 'online', uptime: process.uptime(), memory: process.memoryUsage() });
 });
 
-/**
- * GET /api/history - Retorna histórico de mensagens
- */
 app.get('/api/history', (req, res) => {
   res.json(appState.history.slice(-50));
 });
 
-/**
- * GET /api/logs - Retorna últimos logs
- */
 app.get('/api/logs', (req, res) => {
   res.json(appState.logs.slice(-100));
 });
 
-/**
- * GET /api/config - Retorna configurações
- */
 app.get('/api/config', (req, res) => {
   res.json(appState.config);
 });
 
-/**
- * POST /api/config - Salvar configurações
- */
+// Salvar configurações — agora elas são realmente usadas pela IA
 app.post('/api/config', (req, res) => {
   try {
-    appState.config = { ...appState.config, ...req.body };
-    adicionarLog('[SUCCESS]', 'Configurações atualizadas');
-    res.json({ success: true, message: 'Configurações salvas' });
+    const { aiModel, temperature, maxTokens, customPrompt } = req.body;
+    if (aiModel) appState.config.aiModel = aiModel;
+    if (temperature !== undefined) appState.config.temperature = parseFloat(temperature);
+    if (maxTokens !== undefined) appState.config.maxTokens = parseInt(maxTokens);
+    if (customPrompt !== undefined) appState.config.customPrompt = customPrompt;
+    adicionarLog('[SUCCESS]', 'Configurações atualizadas via dashboard');
+    res.json({ success: true, message: 'Configurações salvas', config: appState.config });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-/**
- * POST /api/send-message - Enviar mensagem manual
- */
 app.post('/api/send-message', async (req, res) => {
   try {
     const { phone, type, text } = req.body;
-
-    if (!phone || !text) {
-      return res.status(400).json({ error: 'Phone e text são obrigatórios' });
-    }
+    if (!phone || !text) return res.status(400).json({ error: 'phone e text são obrigatórios' });
 
     let resposta = text;
-
     if (type === 'ai') {
-      resposta = await gerarResposta(text);
+      resposta = await gerarResposta(phone, text, appState.config);
     }
 
     await sendMessage(phone, resposta);
-
     appState.messagesSent++;
     appState.history.push({
-      phone,
-      message: resposta,
+      phone, message: resposta,
       type: type === 'ai' ? 'IA' : 'Manual',
       timestamp: new Date().toISOString(),
       status: 'enviada',
@@ -302,23 +235,15 @@ app.post('/api/send-message', async (req, res) => {
   }
 });
 
-/**
- * POST /api/send-document - Enviar documento
- */
 app.post('/api/send-document', async (req, res) => {
   try {
     const { phone, docUrl, docName } = req.body;
-
-    if (!phone || !docUrl) {
-      return res.status(400).json({ error: 'Phone e docUrl são obrigatórios' });
-    }
+    if (!phone || !docUrl) return res.status(400).json({ error: 'phone e docUrl são obrigatórios' });
 
     await sendDocument(phone, docUrl, docName || 'documento.pdf');
-
     appState.messagesSent++;
     appState.history.push({
-      phone,
-      message: `📄 Documento: ${docName}`,
+      phone, message: `📄 Documento: ${docName}`,
       type: 'Documento',
       timestamp: new Date().toISOString(),
       status: 'enviada',
@@ -333,27 +258,23 @@ app.post('/api/send-document', async (req, res) => {
   }
 });
 
-/**
- * Iniciar servidor
- */
+// Novo endpoint: limpar histórico de um usuário pelo dashboard
+app.delete('/api/history/:phone', (req, res) => {
+  const phone = req.params.phone;
+  limparHistorico(phone);
+  adicionarLog('[INFO]', `Histórico limpo para ${phone}`);
+  res.json({ success: true, message: `Histórico de ${phone} limpo` });
+});
+
+// ─── Iniciar ──────────────────────────────────────────────────────────────────
+
 app.listen(PORT, () => {
-  console.log(`[Server] ✅ Servidor rodando em porta ${PORT}`);
+  console.log(`[Server] ✅ Rodando na porta ${PORT}`);
   console.log(`[Server] Dashboard: http://localhost:${PORT}`);
-  console.log(`[Server] Webhook URL: http://seu-dominio.com/webhook`);
-  console.log(`[Server] Endpoints disponíveis:`);
-  console.log(`[Server]   GET  / - Health check`);
-  console.log(`[Server]   GET  /webhook - Validação do webhook`);
-  console.log(`[Server]   POST /webhook - Receber mensagens`);
-  console.log(`[Server]   GET  /api/stats - Estatísticas`);
-  console.log(`[Server]   GET  /api/history - Histórico`);
-  console.log(`[Server]   GET  /api/logs - Logs`);
-  console.log(`[Server]   POST /api/send-message - Enviar mensagem`);
-  console.log(`[Server]   POST /api/send-document - Enviar documento`);
   adicionarLog('[INFO]', 'Servidor iniciado com sucesso');
 });
 
-// Tratar erros não capturados
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('[Error] Promessa rejeitada não tratada:', reason);
 });
 
