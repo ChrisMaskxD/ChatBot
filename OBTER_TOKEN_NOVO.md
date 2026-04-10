@@ -133,9 +133,11 @@ Uma vez confirmado que o token funciona:
 WHATSAPP_TOKEN=seu_novo_token_aqui
 PHONE_NUMBER_ID=1084256431433158
 WEBHOOK_VERIFY_TOKEN=test_verify_token_demo
-OPENAI_API_KEY=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
+OPENAI_API_KEY=sk-proj-sua-chave-aqui-nao-compartilhe
 PORT=3000
 ```
+
+⚠️ **SEGURANÇA:** Nunca compartilhe sua chave real do OpenAI. Use apenas em `.env` local!
 
 ### Reinicie o servidor:
 ```bash

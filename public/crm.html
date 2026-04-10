@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM WhatsApp - Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #25d366;
+      --secondary: #128c7e;
+      --danger: #e74c3c;
+      --warning: #f39c12;
+      --info: #3498db;
+      --dark: #1a1a1a;
+      --light: #f5f5f5;
+      --border: #ddd;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: var(--light);
+      color: var(--dark);
+      line-height: 1.6;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      background-color: var(--secondary);
+      color: white;
+      padding: 20px;
+      overflow-y: auto;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    }
+
+    .sidebar h1 {
+      font-size: 20px;
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar ul {
+      list-style: none;
+    }
+
+    .sidebar li {
+      margin-bottom: 10px;
+    }
+
+    .sidebar a {
+      color: white;
+      text-decoration: none;
+      padding: 12px 15px;
+      border-radius: 5px;
+      display: block;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .sidebar a:hover,
+    .sidebar a.active {
+      background-color: var(--primary);
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .header h2 {
+      font-size: 24px;
+      color: var(--secondary);
+    }
+
+    .search-box {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .search-box input {
+      padding: 10px 15px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 14px;
+      min-width: 200px;
+    }
+
+    .search-box button {
+      padding: 10px 20px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .search-box button:hover {
+      background-color: var(--secondary);
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    /* Grid de Cards */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+
+    .card h3 {
+      font-size: 14px;
+      color: #999;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .card .value {
+      font-size: 32px;
+      font-weight: bold;
+      color: var(--primary);
+    }
+
+    .card .subtext {
+      font-size: 12px;
+      color: #999;
+      margin-top: 10px;
+    }
+
+    /* Tabelas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    table thead {
+      background-color: var(--secondary);
+      color: white;
+    }
+
+    table th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    table td {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table tbody tr:hover {
+      background-color: #f9f9f9;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .status.ativo {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .status.inativo {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+
+    .status.bloqueado {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    .tag {
+      display: inline-block;
+      background-color: var(--primary);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+
+    .tag.vip {
+      background-color: #f39c12;
+    }
+
+    .tag.cliente {
+      background-color: #3498db;
+    }
+
+    .tag.lead {
+      background-color: #9b59b6;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 15px;
+    }
+
+    .modal-header h2 {
+      color: var(--secondary);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+    }
+
+    /* Botões */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--secondary);
+    }
+
+    .btn-danger {
+      background-color: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background-color: #c0392b;
+    }
+
+    .btn-info {
+      background-color: var(--info);
+      color: white;
+    }
+
+    .btn-small {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+
+    /* Hide/Show sections */
+    .section {
+      display: none;
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-size: 18px;
+    }
+
+    .spinner {
+      border: 4px solid var(--light);
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Stats por Status */
+    .stats-status {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .stat-box {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .stat-box .label {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 10px;
+    }
+
+    .stat-box .number {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .message-item {
+      background: #f9f9f9;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border-left: 4px solid var(--primary);
+    }
+
+    .message-item.outgoing {
+      background: #e8f5e9;
+      border-left-color: var(--primary);
+    }
+
+    .message-item.incoming {
+      background: #e3f2fd;
+      border-left-color: var(--info);
+    }
+
+    .message-meta {
+      font-size: 11px;
+      color: #999;
+      margin-bottom: 5px;
+    }
+
+    .message-content {
+      font-size: 14px;
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        height: auto;
+        display: flex;
+        align-items: center;
+      }
+
+      .sidebar ul {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .search-box input {
+        min-width: 150px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h1>🤖 WhatsApp CRM</h1>
+      <ul>
+        <li><a class="nav-link active" data-page="dashboard">📊 Dashboard</a></li>
+        <li><a class="nav-link" data-page="contatos">👥 Contatos</a></li>
+        <li><a class="nav-link" data-page="mensagens">💬 Mensagens</a></li>
+        <li><a class="nav-link" data-page="tags">🏷️ Tags</a></li>
+        <li><a class="nav-link" data-page="analytics">📈 Analytics</a></li>
+      </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Header -->
+      <div class="header">
+        <h2 id="page-title">📊 Dashboard</h2>
+        <div class="search-box">
+          <input type="text" id="search-input" placeholder="Buscar contatos...">
+          <button onclick="searchContacts()">🔍 Buscar</button>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="content">
+        <!-- DASHBOARD -->
+        <div id="dashboard" class="section active">
+          <div id="dashboard-content"></div>
+        </div>
+
+        <!-- CONTATOS -->
+        <div id="contatos" class="section">
+          <div style="margin-bottom: 20px;">
+            <button class="btn btn-primary" onclick="openAddContactModal()">➕ Novo Contato</button>
+          </div>
+          <div id="contatos-content"></div>
+        </div>
+
+        <!-- MENSAGENS -->
+        <div id="mensagens" class="section">
+          <div id="mensagens-content"></div>
+        </div>
+
+        <!-- TAGS -->
+        <div id="tags" class="section">
+          <div id="tags-content"></div>
+        </div>
+
+        <!-- ANALYTICS -->
+        <div id="analytics" class="section">
+          <div id="analytics-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Adicionar Contato -->
+  <div id="addContactModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>➕ Novo Contato</h2>
+        <button class="close-btn" onclick="closeAddContactModal()">✕</button>
+      </div>
+      <form onsubmit="saveNewContact(event)">
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold;">Telefone *</label>
+          <input type="text" id="new-phone" placeholder="55..." required style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nome</label>
+          <input type="text" id="new-name" placeholder="Nome completo" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email</label>
+          <input type="email" id="new-email" placeholder="email@example.com" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold;">Empresa</label>
+          <input type="text" id="new-company" placeholder="Nome da empresa" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="btn" style="background-color: #ccc; color: #333;" onclick="closeAddContactModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Contato</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal para Ver Perfil de Contato -->
+  <div id="profileModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="profile-name">Perfil do Contato</h2>
+        <button class="close-btn" onclick="closeProfileModal()">✕</button>
+      </div>
+      <div id="profile-content"></div>
+    </div>
+  </div>
+
+  <script>
+    // Global estado
+    let currentPage = 'dashboard';
+    let allContacts = [];
+    let allDashboard = {};
+
+    // Event Listeners
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = e.target.dataset.page;
+        switchPage(page);
+      });
+    });
+
+    // Trocar página
+    function switchPage(page) {
+      currentPage = page;
+      
+      // Update sidebar
+      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+      document.querySelector(`[data-page="${page}"]`).classList.add('active');
+      
+      // Update header
+      const titles = {
+        dashboard: '📊 Dashboard',
+        contatos: '👥 Contatos',
+        mensagens: '💬 Mensagens',
+        tags: '🏷️ Tags',
+        analytics: '📈 Analytics'
+      };
+      document.getElementById('page-title').textContent = titles[page];
+      
+      // Hide all sections
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById(page).classList.add('active');
+      
+      // Load page data
+      loadPageData(page);
+    }
+
+    // Load dados de cada página
+    async function loadPageData(page) {
+      try {
+        if (page === 'dashboard') {
+          await loadDashboard();
+        } else if (page === 'contatos') {
+          await loadContatos();
+        } else if (page === 'mensagens') {
+          await loadMensagens();
+        } else if (page === 'tags') {
+          await loadTags();
+        } else if (page === 'analytics') {
+          await loadAnalytics();
+        }
+      } catch (error) {
+        console.error('Erro ao carregar página:', error);
+      }
+    }
+
+    // Dashboard
+    async function loadDashboard() {
+      const content = document.getElementById('dashboard-content');
+      content.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando...</div>';
+
+      try {
+        const res = await fetch('/api/crm/dashboard');
+        const data = await res.json();
+        allDashboard = data;
+
+        let html = `
+          <div class="grid">
+            <div class="card">
+              <h3>Total de Contatos</h3>
+              <div class="value">${data.totalContacts}</div>
+              <div class="subtext">${data.activeContacts} ativos</div>
+            </div>
+            <div class="card">
+              <h3>Total de Mensagens</h3>
+              <div class="value">${data.totalMessages}</div>
+              <div class="subtext">${data.incomingMessages} recebidas, ${data.outgoingMessages} enviadas</div>
+            </div>
+            <div class="card">
+              <h3>Contatos Bloqueados</h3>
+              <div class="value" style="color: var(--danger);">${data.blockedContacts}</div>
+              <div class="subtext">Número de usuários bloqueados</div>
+            </div>
+            <div class="card">
+              <h3>Taxa de Atividade</h3>
+              <div class="value" style="color: var(--info);">${Math.round((data.activeContacts / data.totalContacts) * 100)}%</div>
+              <div class="subtext">Contatos ativos</div>
+            </div>
+          </div>
+
+          <h3 style="margin-bottom: 15px;">Status dos Contatos</h3>
+          <div class="stats-status">
+            <div class="stat-box">
+              <div class="label">Ativos</div>
+              <div class="number" style="color: #27ae60;">${data.contactsByStatus.ativo}</div>
+            </div>
+            <div class="stat-box">
+              <div class="label">Inativos</div>
+              <div class="number" style="color: #f39c12;">${data.contactsByStatus.inativo}</div>
+            </div>
+            <div class="stat-box">
+              <div class="label">Bloqueados</div>
+              <div class="number" style="color: #e74c3c;">${data.contactsByStatus.bloqueado}</div>
+            </div>
+          </div>
+
+          <h3 style="margin-bottom: 15px;">🏷️ Top Tags</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Quantidade</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.topTags.map(t => `
+                <tr>
+                  <td><span class="tag">${t.tag}</span></td>
+                  <td><strong>${t.count}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <br>
+          <h3 style="margin-bottom: 15px;">👥 Top Contatos (Mais Ativos)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Mensagens</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.topContacts.map(c => `
+                <tr onclick="viewContactProfile('${c.phone}')" style="cursor: pointer;">
+                  <td><strong>${c.name}</strong></td>
+                  <td>${c.phone}</td>
+                  <td><span style="background: #e3f2fd; padding: 5px 10px; border-radius: 5px; font-weight: bold;">${c.messageCount}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+        content.innerHTML = html;
+      } catch (error) {
+        content.innerHTML = `<p style="color: var(--danger);">Erro ao carregar dashboard: ${error.message}</p>`;
+      }
+    }
+
+    // Contatos
+    async function loadContatos() {
+      const content = document.getElementById('contatos-content');
+      content.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando contatos...</div>';
+
+      try {
+        const res = await fetch('/api/crm/contacts');
+        const data = await res.json();
+        allContacts = data.data;
+
+        if (data.total === 0) {
+          content.innerHTML = '<p style="text-align: center; padding: 40px; color: #999;">Nenhum contato registrado ainda</p>';
+          return;
+        }
+
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Tags</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.data.map(contact => `
+                <tr>
+                  <td><strong>${contact.name}</strong></td>
+                  <td>${contact.phone}</td>
+                  <td>${contact.email || '-'}</td>
+                  <td><span class="status ${contact.status}">${contact.status}</span></td>
+                  <td>
+                    ${contact.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                  </td>
+                  <td>
+                    <button class="btn btn-info btn-small" onclick="viewContactProfile('${contact.phone}')">Ver</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+        content.innerHTML = html;
+      } catch (error) {
+        content.innerHTML = `<p style="color: var(--danger);">Erro ao carregar contatos: ${error.message}</p>`;
+      }
+    }
+
+    // Ver perfil de contato
+    async function viewContactProfile(phone) {
+      const modal = document.getElementById('profileModal');
+      const content = document.getElementById('profile-content');
+      content.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando perfil...</div>';
+      modal.classList.add('show');
+
+      try {
+        const res = await fetch(`/api/crm/contacts/${phone}`);
+        const profile = await res.json();
+
+        document.getElementById('profile-name').textContent = `${profile.name} (${profile.phone})`;
+
+        let html = `
+          <div style="margin-bottom: 20px;">
+            <h4>Informações Gerais</h4>
+            <table style="width: 100%; font-size: 14px;">
+              <tr>
+                <td style="padding: 8px; background: #f9f9f9;"><strong>Telefone:</strong></td>
+                <td style="padding: 8px; background: #f9f9f9;">${profile.phone}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;"><strong>Nome:</strong></td>
+                <td style="padding: 8px;">${profile.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; background: #f9f9f9;"><strong>Email:</strong></td>
+                <td style="padding: 8px; background: #f9f9f9;">${profile.email || '-'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;"><strong>Empresa:</strong></td>
+                <td style="padding: 8px;">${profile.company || '-'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; background: #f9f9f9;"><strong>Status:</strong></td>
+                <td style="padding: 8px; background: #f9f9f9;"><span class="status ${profile.status}">${profile.status}</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;"><strong>Criado em:</strong></td>
+                <td style="padding: 8px;">${new Date(profile.createdAt).toLocaleString('pt-BR')}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <h4>Tags</h4>
+            <div style="margin-bottom: 10px;">
+              ${profile.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+            </div>
+            <input type="text" id="new-tag-input" placeholder="Adicionar tag..." style="padding: 8px; border: 1px solid var(--border); border-radius: 5px; width: 70%;">
+            <button class="btn btn-primary btn-small" onclick="addTagToContact('${phone}')">Adicionar</button>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <h4>Estatísticas de Conversa</h4>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+              <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 12px; color: #999;">Total</div>
+                <div style="font-size: 24px; font-weight: bold; color: var(--info);">${profile.stats.total}</div>
+              </div>
+              <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 12px; color: #999;">Recebidas</div>
+                <div style="font-size: 24px; font-weight: bold; color: #27ae60;">${profile.stats.incoming}</div>
+              </div>
+              <div style="background: #fff3e0; padding: 15px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 12px; color: #999;">Enviadas</div>
+                <div style="font-size: 24px; font-weight: bold; color: #f39c12;">${profile.stats.outgoing}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <h4>Notas</h4>
+            <textarea id="contact-notes" style="width: 100%; height: 80px; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font-family: monospace; font-size: 12px;">${profile.notes || 'Nenhuma nota'}</textarea>
+            <button class="btn btn-primary" onclick="saveContactNote('${phone}')" style="margin-top: 10px;">💾 Salvar Nota</button>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <h4>Últimas Mensagens</h4>
+            ${profile.recentMessages.map(msg => `
+              <div class="message-item ${msg.direction}">
+                <div class="message-meta">${msg.direction === 'incoming' ? '👤 Cliente' : '🤖 Bot'} - ${new Date(msg.timestamp).toLocaleString('pt-BR')}</div>
+                <p class="message-content">${msg.content}</p>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="display: flex; gap: 10px; justify-content: space-between;">
+            <div>
+              ${profile.status !== 'bloqueado' ? `<button class="btn btn-danger btn-small" onclick="blockContact('${phone}')">🚫 Bloquear</button>` : `<button class="btn btn-primary btn-small" onclick="unblockContact('${phone}')">✅ Desbloquear</button>`}
+              <button class="btn btn-danger btn-small" onclick="deleteContact('${phone}')" style="margin-left: 5px;">🗑️ Deletar</button>
+            </div>
+            <button class="btn btn-info btn-small" onclick="exportHistory('${phone}')">📥 Exportar Histórico</button>
+          </div>
+        `;
+
+        content.innerHTML = html;
+      } catch (error) {
+        content.innerHTML = `<p style="color: var(--danger);">Erro ao carregar perfil: ${error.message}</p>`;
+      }
+    }
+
+    // Adicionar tag
+    async function addTagToContact(phone) {
+      const tagInput = document.getElementById('new-tag-input');
+      const tag = tagInput.value.trim();
+      
+      if (!tag) {
+        alert('Digite uma tag!');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/crm/contacts/${phone}/tags`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag })
+        });
+
+        if (res.ok) {
+          tagInput.value = '';
+          viewContactProfile(phone);
+        } else {
+          alert('Erro ao adicionar tag');
+        }
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      }
+    }
+
+    // Salvar nota
+    async function saveContactNote(phone) {
+      const noteText = document.getElementById('contact-notes').value;
+      
+      try {
+        await fetch(`/api/crm/contacts/${phone}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note: noteText })
+        });
+        alert('Nota salva com sucesso!');
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      }
+    }
+
+    // Bloquear contato
+    async function blockContact(phone) {
+      const reason = prompt('Motivo do bloqueio:');
+      if (!reason) return;
+
+      try {
+        await fetch(`/api/crm/contacts/${phone}/block`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        alert('Contato bloqueado!');
+        viewContactProfile(phone);
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      }
+    }
+
+    // Desbloquear contato
+    async function unblockContact(phone) {
+      try {
+        await fetch(`/api/crm/contacts/${phone}/unblock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        alert('Contato desbloqueado!');
+        viewContactProfile(phone);
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      }
+    }
+
+    // Deletar contato
+    async function deleteContact(phone) {
+      if (!confirm('Tem certeza que quer deletar este contato? Isso não pode ser desfeito!')) return;
+
+      try {
+        await fetch(`/api/crm/contacts/${phone}`, {
+          method: 'DELETE'
+        });
+        alert('Contato deletado!');
+        closeProfileModal();
+        loadContatos();
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      }
+    }
+
+    // Exportar histórico
+    async function exportHistory(phone) {
+      try {
+        window.open(`/api/crm/messages/${phone}/export`, '_blank');
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      }
+    }
+
+    // Modais
+    function openAddContactModal() {
+      document.getElementById('addContactModal').classList.add('show');
+    }
+
+    function closeAddContactModal() {
+      document.getElementById('addContactModal').classList.remove('show');
+      document.getElementById('new-phone').value = '';
+      document.getElementById('new-name').value = '';
+      document.getElementById('new-email').value = '';
+      document.getElementById('new-company').value = '';
+    }
+
+    function closeProfileModal() {
+      document.getElementById('profileModal').classList.remove('show');
+    }
+
+    // Salvar novo contato
+    async function saveNewContact(event) {
+      event.preventDefault();
+
+      const phone = document.getElementById('new-phone').value;
+      const name = document.getElementById('new-name').value;
+      const email = document.getElementById('new-email').value;
+      const company = document.getElementById('new-company').value;
+
+      try {
+        const res = await fetch('/api/crm/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, name, email, company })
+        });
+
+        if (res.ok) {
+          alert('Contato salvo com sucesso!');
+          closeAddContactModal();
+          loadContatos();
+        } else {
+          alert('Erro ao salvar contato');
+        }
+      } catch (error) {
+        alert(`Erro: ${error.message}`);
+      }
+    }
+
+    // Buscar contatos
+    async function searchContacts() {
+      const query = document.getElementById('search-input').value;
+      if (!query) {
+        loadContatos();
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/crm/contacts?search=${query}`);
+        const data = await res.json();
+
+        const content = document.getElementById('contatos-content');
+        if (data.total === 0) {
+          content.innerHTML = '<p style="text-align: center; padding: 40px; color: #999;">Nenhum contato encontrado</p>';
+          return;
+        }
+
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Tags</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.data.map(contact => `
+                <tr>
+                  <td><strong>${contact.name}</strong></td>
+                  <td>${contact.phone}</td>
+                  <td>${contact.email || '-'}</td>
+                  <td><span class="status ${contact.status}">${contact.status}</span></td>
+                  <td>
+                    ${contact.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                  </td>
+                  <td>
+                    <button class="btn btn-info btn-small" onclick="viewContactProfile('${contact.phone}')">Ver</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+        content.innerHTML = html;
+      } catch (error) {
+        alert(`Erro na busca: ${error.message}`);
+      }
+    }
+
+    // Placeholder para outras seções
+    async function loadMensagens() {
+      document.getElementById('mensagens-content').innerHTML = '<p style="padding: 20px; color: #999;">Funcionalidade em desenvolvimento...</p>';
+    }
+
+    async function loadTags() {
+      document.getElementById('tags-content').innerHTML = '<p style="padding: 20px; color: #999;">Funcionalidade em desenvolvimento...</p>';
+    }
+
+    async function loadAnalytics() {
+      document.getElementById('analytics-content').innerHTML = '<p style="padding: 20px; color: #999;">Funcionalidade em desenvolvimento...</p>';
+    }
+
+    // Load dashboard inicial
+    window.addEventListener('load', () => {
+      loadDashboard();
+    });
+  </script>
+</body>
+</html>

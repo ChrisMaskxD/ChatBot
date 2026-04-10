@@ -1,67 +1,75 @@
 const axios = require('axios');
 
-const WHATSAPP_API_URL = `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}`;
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const EVO_URL = process.env.EVOLUTION_API_URL;
+const API_KEY = process.env.EVOLUTION_API_KEY;
+const INSTANCE = process.env.EVOLUTION_INSTANCE_NAME;
 
+const headers = {
+  'Content-Type': 'application/json',
+  'apikey': API_KEY
+};
+
+/**
+ * Envia mensagem de texto
+ */
 async function sendMessage(numeroDestino, texto) {
   try {
-    console.log(`[WhatsApp] Enviando mensagem para ${numeroDestino}`);
+    console.log(`[Evolution] Enviando texto para ${numeroDestino}`);
+
     const payload = {
-      messaging_product: 'whatsapp',
-      to: numeroDestino,
-      type: 'text',
-      text: { preview_url: false, body: texto },
+      number: numeroDestino.replace(/\D/g, ''),
+      text: texto
     };
+
     const response = await axios.post(
-      `${WHATSAPP_API_URL}/${PHONE_NUMBER_ID}/messages`,
+      `${EVO_URL}/message/sendText/${INSTANCE}`,
       payload,
-      { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' } }
+      { headers }
     );
-    console.log(`[WhatsApp] Mensagem enviada. ID: ${response.data.messages[0].id}`);
+
+    console.log(`[Evolution] Mensagem enviada com sucesso!`);
     return response.data;
   } catch (error) {
-    console.error('[WhatsApp] Erro ao enviar mensagem:', error.response?.data || error.message);
+    console.error('[Evolution] Erro ao enviar mensagem:', error.response?.data || error.message);
     throw error;
   }
 }
 
+/**
+ * Envia documento (PDF)
+ */
 async function sendDocument(numeroDestino, linkPDF, nomeArquivo) {
   try {
-    console.log(`[WhatsApp] Enviando documento para ${numeroDestino}: ${nomeArquivo}`);
+    console.log(`[Evolution] Enviando documento para ${numeroDestino}`);
+
     const payload = {
-      messaging_product: 'whatsapp',
-      to: numeroDestino,
-      type: 'document',
-      document: { link: linkPDF, filename: nomeArquivo },
+      number: numeroDestino.replace(/\D/g, ''),
+      media: linkPDF,
+      fileName: nomeArquivo || 'catalogo.pdf',
+      caption: 'Aqui está nosso catálogo! 📄',
+      mediatype: 'document'
     };
+
     const response = await axios.post(
-      `${WHATSAPP_API_URL}/${PHONE_NUMBER_ID}/messages`,
+      `${EVO_URL}/message/sendMedia/${INSTANCE}`,
       payload,
-      { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' } }
+      { headers }
     );
-    console.log(`[WhatsApp] Documento enviado. ID: ${response.data.messages[0].id}`);
+
+    console.log(`[Evolution] Documento enviado com sucesso!`);
     return response.data;
   } catch (error) {
-    console.error('[WhatsApp] Erro ao enviar documento:', error.response?.data || error.message);
+    console.error('[Evolution] Erro ao enviar documento:', error.response?.data || error.message);
     throw error;
   }
 }
 
+/**
+ * Marca como lida (Evolution não precisa, mas mantemos compatibilidade)
+ */
 async function markAsRead(messageId) {
-  try {
-    const payload = { messaging_product: 'whatsapp', status: 'read', message_id: messageId };
-    const response = await axios.post(
-      `${WHATSAPP_API_URL}/${PHONE_NUMBER_ID}/messages`,
-      payload,
-      { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' } }
-    );
-    console.log(`[WhatsApp] Mensagem marcada como lida: ${messageId}`);
-    return response.data;
-  } catch (error) {
-    console.error('[WhatsApp] Erro ao marcar como lida:', error.message);
-    throw error;
-  }
+  console.log(`[Evolution] Mensagem ${messageId} marcada como lida (simulado)`);
+  return { success: true };
 }
 
 module.exports = { sendMessage, sendDocument, markAsRead };
